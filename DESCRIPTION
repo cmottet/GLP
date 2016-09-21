@@ -10,4 +10,7 @@ LazyData: TRUE
 RoxygenNote: 5.0.1.9000
 Imports:
   lpSolve,
-  GenSA
+  GenSA,
+  dplyr,
+  plyr,
+  gtools

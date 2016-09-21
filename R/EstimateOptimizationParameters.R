@@ -1,87 +1,267 @@
-getOptimParam = function(sample,a,m = NULL,d=NULL,mTruth = NULL,dTruth = NULL,seed = NULL,positive = TRUE)
+#' Title
+#'
+#' @param d
+#' @param m
+#'
+#' @return
+#' @export
+#'
+#' @examples
+#' d <- c(4,2,1)
+#' m <- 0:3
+#' cleanAndcheckdAndm(d,m)
+#'
+#' d <- c(1/2,2,1)
+#' cleanAndcheckdAndm(d,m)
+#'
+#' d <- 0:3
+#' m <- 1:3
+#' cleanAndcheckdAndm(d,m)
+#'
+#'
+cleanAndcheckdAndm <- function(d,m){
+
+  if (any(round(d)!= d)) return("All derivatives order must a positive integer.")
+  if (any(d > 3)) return("I am currently unable to estimate  density derivative or order higher than 2.")
+  if (0 %in% d ) {
+    d <- d[d!=0]
+    if ( !(0 %in% m)) m <- c(m,0)
+  }
+  d <- sort(d, decreasing = TRUE)
+  m <- sort(m)
+
+  output <- list(d = d, m= m)
+  return(output)
+}
+
+#' Title
+#'
+#' @param sample
+#' @param fboot
+#' @param nboot
+#' @param ...
+#'
+#' @return
+#' @export
+#' @importFrom bootstrap bootstrap
+#'
+#' @examples
+#' sample <- rnorm(1e4,0,1)
+#' fboot <-  list(function(x) mean(x), function(x) sd(x))
+#' bootstrapedValues <- getBootstrapedValues(sample,fboot, nboot = 1E4, mc.cores = 4)
+#' head(bootstrapedValues)
+#'
+getBootstrapedValues <- function(sample, fboot, nboot = 1E3,mc.cores = 1,...)
 {
+  if (class(fboot) != "list") fboot <- as.list(fboot)
 
-  if (length(m)!=0 & length(d)!=0 &  0%in% m & 0%in% d) m = m[-(m==0)]
-  if (any(d > 3)) {print("Cannot estimate  density derivative or order higher than 2") ; d = d[d <=2]}
-
-  param = names =  NULL
-  cover = matrix(TRUE,ncol = 1,nrow = length(a))
-
-  # Set the seed so that all the parameters get
-  # estimated on the same set of bootstrapepd samples
-  if (is.null(seed)) seed = floor(runif(1,0,1e8))
-
-
-  ## Adjust Bonferroni's correction based
-  ## on the total number of CI's to estimate
-  bonferroni = length(m) + length(d)
-
-  ##
-  ## Compute the derivatives estimates
-  ##
-  if (length(d) >=1)
-  {
-    names = c(names,paste(rep(paste("d",d,sep=""),each = 2),c("L","U"),sep="")  )
-
-    for (order in d)
-    {
-      ##
-      ## Compute the tail distribution estimation
-      ##
-      if (order == 0)
-      {
-        args = list(eval.points = a, positive = positive, func = kcde)
-        tmp  = CI.bootstrap(sample,f1,args,bonferroni = bonferroni,seed = seed)
-        newparam = matrix(cbind(1-tmp$CI$upper,1-tmp$CI$lower),nrow = length(a))
-        param   = cbind(param, newparam)
-      }
-
-      ##
-      ## Compute the moments estimates
-      ##
-      if (order >=1){
-        args = list(eval.points = a, positive = positive,deriv.order = order-1, func = kdde)
-        tmp = CI.bootstrap(sample,f2,args,bonferroni = bonferroni,seed = seed)
-        newparam = t(apply((-1)^(order+1)*matrix(cbind(tmp$CI$lower,tmp$CI$upper),nrow = length(a)),1,sort))
-        param = cbind(param,newparam)
-      }
-
-      if (!is.null(dTruth))
-        cover = cover & apply(newparam,1,is.between,x = subset(dTruth,select = paste("d",order,sep ="") ))
-
-    }
-  }
-
-  if( !(0 %in% d) ) {
-    param   = cbind(param, matrix(rep(c(0,1),length(a)),ncol = 2,byrow = TRUE)) ; names = c(names,"d0L","d0U")
-  }
-
-
-  if (length(m) >=1)
-  {
-    names = c(names,paste(rep(paste("m",m,sep=""),each = 2),c("L","U"),sep="")  )
-
-    for (order in m)
-    {
-      fboot =  eval(substitute(function(sample,args) matrix(mean(sample^i*(sample>=args))),list(i=order)))
-      tmp = sapply(a,CI.bootstrap,data = sample,fboot = fboot,bonferroni = bonferroni,seed = seed)
-      newparam = matrix(unlist(tmp[2,]),nrow = length(a),ncol = 2,byrow = TRUE)
-      param    =  cbind(param,newparam)
-
-      if (!is.null(mTruth))
-        cover = cover & apply(newparam,1,is.between,x = subset(mTruth,select = paste("m",order,sep ="") ) )
-    }
-  }
-
-  ##
-  ## Structure output
-  ##
-  output = data.frame(matrix(param,nrow = length(a)))
-  names(output) = names
-
-  if (!is.null(mTruth) & !is.null(dTruth)) output$cover = cover
+  FUN <- function(theta) bootstrap(x = sample, nboot, theta = theta,...)$thetastar
+  bootstrapedValues <- parallel::mclapply(X =  fboot, FUN = FUN,mc.cores = mc.cores, ...)
+  output <- data.frame(t(plyr::ldply(bootstrapedValues)))
 
   return(output)
 }
+
+#' Title
+#'
+#' @param a
+#' @param m
+#' @param d
+#'
+#' @return
+#' @export
+#' @importFrom ks kdde kcde
+#'
+#' @examples
+#' a <- 0
+#' m <- 0:2
+#' d <- 1:3
+#'
+#' # Create the functions to estimate the derivatives and moments
+#' MyFunc <- GLP:::buildMomentAndDerivativesFunctions(a,m,d)
+#'
+#' # Create a sample
+#' sample <- rnorm(1E4, 0, 1 )
+#' Truth <- c((a^2 - 1)*dnorm(a), -a*dnorm(a), dnorm(a), 1- pnorm(a), (2*pi)^(-1/2), 1/2)
+#' data.frame(Truth = Truth , Estimates = sapply(MyFunc, function(f)do.call(f, list(sample = sample))))
+buildMomentAndDerivativesFunctions <- function(a, m, d, ...){
+  # Initialize list of Functions
+  nFunc <- length(d) + length(m)
+  Func <- vector(nFunc,mode = "list")
+
+  i <- 1
+
+  # Build Functions for estimating the derivatives of of 1 <= order <= 3
+  for (order in d){
+    Func[[i]] <- eval(substitute(function(sample) kdde(x = sample, eval.points = a, deriv.order = order-1, ...)$estimate,list(order=order)))
+    i <- i + 1
+  }
+
+  # Build Functions for moments
+  for (order in m){
+    if (order ==0) Func[[i]] <- function(sample) 1-kcde(x = sample, eval.points = a)$estimate
+    if (order !=0) Func[[i]] <- eval(substitute(function(sample) mean(sample^order*(sample >= a), na.rm = TRUE),list(order=order)))
+    i <- i + 1
+  }
+
+  output <- Func
+  return(output)
+}
+
+#' Title
+#'
+#' @param sample
+#' @param a
+#' @param m
+#' @param d
+#' @param nboot
+#' @param alpha
+#' @param method
+#' @param mc.cores
+#' @param ...
+#'
+#' @return
+#' @export
+#' @importFrom dplyr '%>%'
+#'
+#' @examples
+#' a <- 0 ; m <- 0 ; d <- 1 ; nboot <- 100
+#' sample <- rnorm(1E4, 0, 1)
+#' CI <- getCIMomentAndDerivatives(sample, a,m,d,nboot = nboot,mc.cores = 4, method = "both", bootSample = TRUE)
+#'
+#' title <- "Ellipsoidal and Rectangular 95%-CI of the Estimated Parameters"
+#' plot <- plotCI(CI$bootSample, CI)
+#' plot + geom_point(aes(x = dnorm(a), y = 1-pnorm(a)), colour = "blue") +
+#' geom_text(aes(x = 1.009*dnorm(a), y = 1-pnorm(a), label = "True Value"), colour = "blue")+
+#' labs(x = "Derivative of order 1", y = "Moment of order 0") + ggtitle(title)
+#'
+getCIMomentAndDerivatives = function(sample,a,m = NULL,d=NULL, nboot = 1E3, alpha = 0.05, method = c("rectangular","ellipsoid", "both"), mc.cores = 1, bootSample = FALSE, ...)
+{
+
+  method <- match.arg(method)
+
+  # Check conditions and clean up m and d
+  tmp <- cleanAndcheckdAndm(d,m)
+  d <- tmp$d
+  m <- tmp$m
+
+  fboot <- buildMomentAndDerivativesFunctions(a, m, d)
+  bootstrapedMomentAndDerivatives <- getBootstrapedValues(sample, fboot, nboot = nboot, mc.cores = mc.cores, ...)
+  names(bootstrapedMomentAndDerivatives) <- c(paste0("d",d), paste0("m",m))
+
+  CIrect <- apply(bootstrapedMomentAndDerivatives, 2, quantile, probs = c(alpha/2,1-alpha/2)) %>% data.frame
+  CIellipsoid <-  list(mu = colMeans(bootstrapedMomentAndDerivatives, na.rm = TRUE),
+                               Sigma = cov(bootstrapedMomentAndDerivatives, use = "complete.ob"),
+                               radius = sqrt(qchisq(1-alpha/2, df = length(d) + length(m))))
+
+  if (method == "rectangular") output <- CIrect
+  if (method == "ellipsoid")   output <- CIellipsoid
+  if (method == "both")        output <- list(rectangular = CIrect, ellipsoid = CIellipsoid)
+
+  # If required, return the sample of derivatives and moments obtained by bootstrap
+  if (bootSample) output <- c(output, list(bootSample = bootstrapedMomentAndDerivatives))
+
+  return(output)
+}
+
+#' Title
+#'
+#' @param sample
+#' @param CI
+#'
+#' @return
+#' @export
+#' @importFrom gtools combinations
+#'
+#' @examples
+#'set.seed(100)
+#' n <- 300 ;  mu <- c(1,2,3) ; Sigma <- matrix(c(6,0,0,0,1,1,0,1,1),ncol =3) ; alpha = 0.05
+#' sample <- MASS::mvrnorm(n,mu,Sigma) %>% as.data.frame
+#' CIellipsoid <- list(mu = colMeans(sample, na.rm = TRUE), Sigma = cov(sample, use = "complete.ob"), radius = sqrt(qchisq(1-alpha/2, df = 2)))
+#' CIrectangular <- apply(sample, 2, quantile, probs = c(alpha/2,1-alpha/2))
+#' CI <- list(ellipsoid = CIellipsoid, rectangular = CIrectangular)
+#' plotCI(sample,CI)
+#'
+#' n <- 300 ;  mu <- c(1,2) ; Sigma <- matrix(c(6,1,1,1),ncol =2) ; alpha = 0.05
+#' sample <- MASS::mvrnorm(n,mu,Sigma) %>% as.data.frame
+#' CIellipsoid <- list(mu = colMeans(sample, na.rm = TRUE), Sigma = cov(sample, use = "complete.ob"), radius = sqrt(qchisq(1-alpha/2, df = 2)))
+#' CIrectangular <- apply(sample, 2, quantile, probs = c(alpha/2,1-alpha/2))
+#' CI <- list(ellipsoid = CIellipsoid, rectangular = CIrectangular)
+#' plotCI(sample,CI)
+
+plotCI <- function(sample,CI)
+{
+  variable <- names(sample)
+  nVar <- ncol(sample)
+  allPairs <-  combinations(nVar,r = 2, repeats.allowed = F, v =  names(sample))
+  dataPlot <- NULL
+  for (i in 1:nrow(allPairs))
+  {
+    newData <- data.frame(xName = allPairs[i,1],
+                          yName = allPairs[i,2],
+                          x = sample[,allPairs[i,1]],
+                          y = sample[,allPairs[i,2]])
+
+    dataPlot <- rbind(dataPlot, newData)
+  }
+  plot <- ggplot(dataPlot) +
+    geom_point(aes(x = x, y = y) ) +
+    facet_grid(yName ~ xName, scales = "free") +
+    labs(x = "", y = "")
+
+  #dataPlotHist <- dplyr::slice( dataPlot,which(dataPlot$xName == dataPlot$yName))
+  #output <- plot + geom_histogram(data = dataPlotHist, aes(x = x))
+
+  if ("rectangular" %in% names(CI))
+  {
+    dataPlotRect <- NULL
+    for (i in 1:nrow(allPairs))
+    {
+      CIrect <- expand.grid(x = CI$rectangular[,allPairs[i,1]] ,
+                            y = CI$rectangular[,allPairs[i,2]])[c(1,3,4,2),]
+
+      newData <- data.frame(xName = allPairs[i,1],
+                            yName = allPairs[i,2],
+                            CIrect)
+
+      dataPlotRect <- rbind(dataPlotRect, newData)
+    }
+
+    plot <- plot + geom_polygon(data = dataPlotRect, aes(x = x, y = y), colour = "red", fill = NA)
+  }
+
+  if ("ellipsoid" %in% names(CI))
+  {
+    dataPlotEllipse <- NULL
+    segments <- 100
+
+    for (i in 1:nrow(allPairs))
+    {
+      pairNames <- allPairs[i,]
+      if (pairNames[1]!= pairNames[2]){
+      Sigma <- CI$ellipsoid$Sigma[pairNames,pairNames ]
+      chol_decomp <- chol(Sigma)
+      radius <- CI$ellipsoid$radius
+      center <- CI$ellipsoid$mu[pairNames]
+
+      angles <- (0:segments) * 2 * pi/segments
+      unit.circle <- cbind(cos(angles), sin(angles))
+      CIellipse <- data.frame(t(center + radius * t(unit.circle %*% chol_decomp)))
+      names(CIellipse) <- c("x", "y")
+
+      newData <- data.frame(xName = allPairs[i,1],
+                            yName = allPairs[i,2],
+                            CIellipse)
+
+      dataPlotEllipse <- rbind(dataPlotEllipse, newData)
+      }
+    }
+
+     plot <- plot + geom_path(data = dataPlotEllipse, aes(x = x, y = y), colour = "green")
+  }
+  output <- plot
+   return(output)
+}
+
 
 

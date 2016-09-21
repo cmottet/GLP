@@ -17,6 +17,16 @@ a basic feasible solution
 Title
 }
 \examples{
+
+####
+#### Finding a basic feasible solution (p,x) such that
+####
+#### sum(p)  = 1
+#### sum(px) = 1
+#### sum(px^2) = 2
+####
+####
+
 # Function objective to maximize
 objFun = function(x,...)   # H for the optim with convexity constraint
 {
@@ -25,26 +35,31 @@ objFun = function(x,...)   # H for the optim with convexity constraint
   return(output)
 }
 
+# Function for the integrals of the constraints inequality
 constFun = rep(list(
 function(x,...) 1,
 function(x,...) x,
 function(x,...) x^2
 ),2)
 
+# Direction of the inequality constraints
 constDir <- rep(c("<=", ">="), each = 3)
 
-rate <- 1
+# Values on the RHS of each inequality
 mu0 <- 1
-mu1 <- 1/rate
-mu2 <- 2/rate^2
+mu1 <- 1
+mu2 <- 2
 
 constRHS <- rep(c(mu0,mu1,mu2), 2)
+
+# Lambdas for the objective function and the constraints functions
 constLambda <- rep(c(0,0,1),2)
 objLambda <- 0
 
-paramObjFun <- list(c = qexp(0.9, rate))
-
-xf <- 1e4
+# Get a basic feasible solution
 initBFS  <-  GLPPhase1(constFun, constRHS,constDir)
+
+# Check feasibility
+with(initBFS, c(sum(p), sum(p*x), sum(p*x^2)))
 }
 
