@@ -18,14 +18,14 @@ n <- 300 ;  mu <- c(1,2,3) ; Sigma <- matrix(c(6,0,0,0,1,1,0,1,1),ncol =3) ; alp
 sample <- MASS::mvrnorm(n,mu,Sigma) \%>\% as.data.frame
 CIellipsoid <- list(mu = colMeans(sample, na.rm = TRUE), Sigma = cov(sample, use = "complete.ob"), radius = sqrt(qchisq(1-alpha/2, df = 2)))
 CIrectangular <- apply(sample, 2, quantile, probs = c(alpha/2,1-alpha/2))
-CI <- list(ellipsoid = CIellipsoid, rectangular = CIrectangular)
+CI <- list(ellipsoid = CIellipsoid, hyperrectangle = CIrectangular)
 plotCI(sample,CI)
 
 n <- 300 ;  mu <- c(1,2) ; Sigma <- matrix(c(6,1,1,1),ncol =2) ; alpha = 0.05
 sample <- MASS::mvrnorm(n,mu,Sigma) \%>\% as.data.frame
 CIellipsoid <- list(mu = colMeans(sample, na.rm = TRUE), Sigma = cov(sample, use = "complete.ob"), radius = sqrt(qchisq(1-alpha/2, df = 2)))
 CIrectangular <- apply(sample, 2, quantile, probs = c(alpha/2,1-alpha/2))
-CI <- list(ellipsoid = CIellipsoid, rectangular = CIrectangular)
+CI <- list(ellipsoid = CIellipsoid, hyperrectangle = CIrectangular)
 plotCI(sample,CI)
 }
 

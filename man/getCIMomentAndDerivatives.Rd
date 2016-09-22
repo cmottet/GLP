@@ -5,7 +5,7 @@
 \title{Title}
 \usage{
 getCIMomentAndDerivatives(sample, a, m = NULL, d = NULL, nboot = 1000,
-  alpha = 0.05, method = c("rectangular", "ellipsoid", "both"),
+  alpha = 0.05, method = c("hyperrectangle", "ellipsoid", "both"),
   mc.cores = 1, bootSample = FALSE, ...)
 }
 \arguments{
@@ -15,8 +15,8 @@ getCIMomentAndDerivatives(sample, a, m = NULL, d = NULL, nboot = 1000,
 Title
 }
 \examples{
-a <- 0 ; m <- 0 ; d <- 1 ; nboot <- 100
-sample <- rnorm(1E4, 0, 1)
+a <- 0 ; m <- c(0, 1) ; d <- 1 ; nboot <- 1000
+sample <- rnorm(100, 0, 1)
 CI <- getCIMomentAndDerivatives(sample, a,m,d,nboot = nboot,mc.cores = 4, method = "both", bootSample = TRUE)
 
 title <- "Ellipsoidal and Rectangular 95\%-CI of the Estimated Parameters"

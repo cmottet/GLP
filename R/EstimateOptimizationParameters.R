@@ -125,8 +125,8 @@ buildMomentAndDerivativesFunctions <- function(a, m, d, ...){
 #' @importFrom dplyr '%>%'
 #'
 #' @examples
-#' a <- 0 ; m <- 0 ; d <- 1 ; nboot <- 100
-#' sample <- rnorm(1E4, 0, 1)
+#' a <- 0 ; m <- c(0, 1) ; d <- 1 ; nboot <- 1000
+#' sample <- rnorm(100, 0, 1)
 #' CI <- getCIMomentAndDerivatives(sample, a,m,d,nboot = nboot,mc.cores = 4, method = "both", bootSample = TRUE)
 #'
 #' title <- "Ellipsoidal and Rectangular 95%-CI of the Estimated Parameters"
@@ -135,7 +135,9 @@ buildMomentAndDerivativesFunctions <- function(a, m, d, ...){
 #' geom_text(aes(x = 1.009*dnorm(a), y = 1-pnorm(a), label = "True Value"), colour = "blue")+
 #' labs(x = "Derivative of order 1", y = "Moment of order 0") + ggtitle(title)
 #'
-getCIMomentAndDerivatives = function(sample,a,m = NULL,d=NULL, nboot = 1E3, alpha = 0.05, method = c("rectangular","ellipsoid", "both"), mc.cores = 1, bootSample = FALSE, ...)
+getCIMomentAndDerivatives = function(sample,a,m = NULL,d=NULL, nboot = 1E3, alpha = 0.05,
+                                     method = c("hyperrectangle","ellipsoid", "both"),
+                                     mc.cores = 1, bootSample = FALSE,...)
 {
 
   method <- match.arg(method)
@@ -145,18 +147,20 @@ getCIMomentAndDerivatives = function(sample,a,m = NULL,d=NULL, nboot = 1E3, alph
   d <- tmp$d
   m <- tmp$m
 
+  BonferroniEllipse <- length(a)
+  BonferroniRectangle <- length(a)*(length(d) + length(m))
   fboot <- buildMomentAndDerivativesFunctions(a, m, d)
   bootstrapedMomentAndDerivatives <- getBootstrapedValues(sample, fboot, nboot = nboot, mc.cores = mc.cores, ...)
   names(bootstrapedMomentAndDerivatives) <- c(paste0("d",d), paste0("m",m))
 
-  CIrect <- apply(bootstrapedMomentAndDerivatives, 2, quantile, probs = c(alpha/2,1-alpha/2)) %>% data.frame
+  CIhyperrect <- apply(bootstrapedMomentAndDerivatives, 2, quantile, probs = c(alpha/(2*BonferroniRectangle),1-alpha/(2*BonferroniRectangle))) %>% data.frame
   CIellipsoid <-  list(mu = colMeans(bootstrapedMomentAndDerivatives, na.rm = TRUE),
-                               Sigma = cov(bootstrapedMomentAndDerivatives, use = "complete.ob"),
-                               radius = sqrt(qchisq(1-alpha/2, df = length(d) + length(m))))
+                       Sigma = cov(bootstrapedMomentAndDerivatives, use = "complete.ob"),
+                       radius = sqrt(qchisq(1-alpha/BonferroniEllipse, df = length(d) + length(m))))
 
-  if (method == "rectangular") output <- CIrect
+  if (method == "hyperrectangle") output <- CIhyperrect
   if (method == "ellipsoid")   output <- CIellipsoid
-  if (method == "both")        output <- list(rectangular = CIrect, ellipsoid = CIellipsoid)
+  if (method == "both")        output <- list(hyperrectangle = CIhyperrect, ellipsoid = CIellipsoid)
 
   # If required, return the sample of derivatives and moments obtained by bootstrap
   if (bootSample) output <- c(output, list(bootSample = bootstrapedMomentAndDerivatives))
@@ -171,6 +175,7 @@ getCIMomentAndDerivatives = function(sample,a,m = NULL,d=NULL, nboot = 1E3, alph
 #'
 #' @return
 #' @export
+#' @import ggplot2
 #' @importFrom gtools combinations
 #'
 #' @examples
@@ -179,14 +184,14 @@ getCIMomentAndDerivatives = function(sample,a,m = NULL,d=NULL, nboot = 1E3, alph
 #' sample <- MASS::mvrnorm(n,mu,Sigma) %>% as.data.frame
 #' CIellipsoid <- list(mu = colMeans(sample, na.rm = TRUE), Sigma = cov(sample, use = "complete.ob"), radius = sqrt(qchisq(1-alpha/2, df = 2)))
 #' CIrectangular <- apply(sample, 2, quantile, probs = c(alpha/2,1-alpha/2))
-#' CI <- list(ellipsoid = CIellipsoid, rectangular = CIrectangular)
+#' CI <- list(ellipsoid = CIellipsoid, hyperrectangle = CIrectangular)
 #' plotCI(sample,CI)
 #'
 #' n <- 300 ;  mu <- c(1,2) ; Sigma <- matrix(c(6,1,1,1),ncol =2) ; alpha = 0.05
 #' sample <- MASS::mvrnorm(n,mu,Sigma) %>% as.data.frame
 #' CIellipsoid <- list(mu = colMeans(sample, na.rm = TRUE), Sigma = cov(sample, use = "complete.ob"), radius = sqrt(qchisq(1-alpha/2, df = 2)))
 #' CIrectangular <- apply(sample, 2, quantile, probs = c(alpha/2,1-alpha/2))
-#' CI <- list(ellipsoid = CIellipsoid, rectangular = CIrectangular)
+#' CI <- list(ellipsoid = CIellipsoid, hyperrectangle = CIrectangular)
 #' plotCI(sample,CI)
 
 plotCI <- function(sample,CI)
@@ -212,17 +217,17 @@ plotCI <- function(sample,CI)
   #dataPlotHist <- dplyr::slice( dataPlot,which(dataPlot$xName == dataPlot$yName))
   #output <- plot + geom_histogram(data = dataPlotHist, aes(x = x))
 
-  if ("rectangular" %in% names(CI))
+  if ("hyperrectangle" %in% names(CI))
   {
     dataPlotRect <- NULL
     for (i in 1:nrow(allPairs))
     {
-      CIrect <- expand.grid(x = CI$rectangular[,allPairs[i,1]] ,
-                            y = CI$rectangular[,allPairs[i,2]])[c(1,3,4,2),]
+      CIhyperrect <- expand.grid(x = CI$hyperrectangle[,allPairs[i,1]] ,
+                                 y = CI$hyperrectangle[,allPairs[i,2]])[c(1,3,4,2),]
 
       newData <- data.frame(xName = allPairs[i,1],
                             yName = allPairs[i,2],
-                            CIrect)
+                            CIhyperrect)
 
       dataPlotRect <- rbind(dataPlotRect, newData)
     }
@@ -239,28 +244,28 @@ plotCI <- function(sample,CI)
     {
       pairNames <- allPairs[i,]
       if (pairNames[1]!= pairNames[2]){
-      Sigma <- CI$ellipsoid$Sigma[pairNames,pairNames ]
-      chol_decomp <- chol(Sigma)
-      radius <- CI$ellipsoid$radius
-      center <- CI$ellipsoid$mu[pairNames]
+        Sigma <- CI$ellipsoid$Sigma[pairNames,pairNames ]
+        chol_decomp <- chol(Sigma)
+        radius <- CI$ellipsoid$radius
+        center <- CI$ellipsoid$mu[pairNames]
 
-      angles <- (0:segments) * 2 * pi/segments
-      unit.circle <- cbind(cos(angles), sin(angles))
-      CIellipse <- data.frame(t(center + radius * t(unit.circle %*% chol_decomp)))
-      names(CIellipse) <- c("x", "y")
+        angles <- (0:segments) * 2 * pi/segments
+        unit.circle <- cbind(cos(angles), sin(angles))
+        CIellipse <- data.frame(t(center + radius * t(unit.circle %*% chol_decomp)))
+        names(CIellipse) <- c("x", "y")
 
-      newData <- data.frame(xName = allPairs[i,1],
-                            yName = allPairs[i,2],
-                            CIellipse)
+        newData <- data.frame(xName = allPairs[i,1],
+                              yName = allPairs[i,2],
+                              CIellipse)
 
-      dataPlotEllipse <- rbind(dataPlotEllipse, newData)
+        dataPlotEllipse <- rbind(dataPlotEllipse, newData)
       }
     }
 
-     plot <- plot + geom_path(data = dataPlotEllipse, aes(x = x, y = y), colour = "green")
+    plot <- plot + geom_path(data = dataPlotEllipse, aes(x = x, y = y), colour = "green")
   }
   output <- plot
-   return(output)
+  return(output)
 }
 
 

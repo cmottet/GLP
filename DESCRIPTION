@@ -13,4 +13,6 @@ Imports:
   GenSA,
   dplyr,
   plyr,
-  gtools
+  gtools,
+  ggplot2
+
