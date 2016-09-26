@@ -125,14 +125,16 @@ buildMomentAndDerivativesFunctions <- function(a, m, d, ...){
 #' @importFrom dplyr '%>%'
 #'
 #' @examples
-#' a <- 0 ; m <- c(0, 1) ; d <- 1 ; nboot <- 1000
-#' sample <- rnorm(100, 0, 1)
+#' a <- c(0,1) ; m <- c(0, 1) ; d <- 1 ; nboot <- 1000
+#' set.seed(100) ; sample <- rnorm(100, 0, 1)
+#' hist(sample)
 #' CI <- getCIMomentAndDerivatives(sample, a,m,d,nboot = nboot,mc.cores = 4, method = "both", bootSample = TRUE)
 #'
-#' title <- "Ellipsoidal and Rectangular 95%-CI of the Estimated Parameters"
-#' plot <- plotCI(CI$bootSample, CI)
-#' plot + geom_point(aes(x = dnorm(a), y = 1-pnorm(a)), colour = "blue") +
-#' geom_text(aes(x = 1.009*dnorm(a), y = 1-pnorm(a), label = "True Value"), colour = "blue")+
+#' i <- 2
+#' title <- paste0("95%-CI of the Estimated Parameters when a = ",a[i])
+#' plot <- plotCI(CI[[i]]$bootSample, CI[[i]])
+#' plot + geom_point(aes(x = dnorm(a[i]), y = 1-pnorm(a[i])), colour = "blue") +
+#' geom_text(aes(x = 1.009*dnorm(a[i]), y = 1-pnorm(a[i]), label = "True Value"), colour = "blue")+
 #' labs(x = "Derivative of order 1", y = "Moment of order 0") + ggtitle(title)
 #'
 getCIMomentAndDerivatives = function(sample,a,m = NULL,d=NULL, nboot = 1E3, alpha = 0.05,
@@ -149,22 +151,26 @@ getCIMomentAndDerivatives = function(sample,a,m = NULL,d=NULL, nboot = 1E3, alph
 
   BonferroniEllipse <- length(a)
   BonferroniRectangle <- length(a)*(length(d) + length(m))
-  fboot <- buildMomentAndDerivativesFunctions(a, m, d)
-  bootstrapedMomentAndDerivatives <- getBootstrapedValues(sample, fboot, nboot = nboot, mc.cores = mc.cores, ...)
-  names(bootstrapedMomentAndDerivatives) <- c(paste0("d",d), paste0("m",m))
+  fboot <- lapply(a,buildMomentAndDerivativesFunctions,  m = m, d = d)
+  bootstrapedMomentAndDerivatives <- lapply(fboot,getBootstrapedValues, sample= sample, nboot = nboot, mc.cores = mc.cores, ...)
 
-  CIhyperrect <- apply(bootstrapedMomentAndDerivatives, 2, quantile, probs = c(alpha/(2*BonferroniRectangle),1-alpha/(2*BonferroniRectangle))) %>% data.frame
-  CIellipsoid <-  list(mu = colMeans(bootstrapedMomentAndDerivatives, na.rm = TRUE),
-                       Sigma = cov(bootstrapedMomentAndDerivatives, use = "complete.ob"),
-                       radius = sqrt(qchisq(1-alpha/BonferroniEllipse, df = length(d) + length(m))))
+  output <- vector("list", length(a))
+  for (i in 1:length(a)){
+    names(bootstrapedMomentAndDerivatives[[i]]) <- c(paste0("d",d), paste0("m",m))
+    CIhyperrect <- apply(bootstrapedMomentAndDerivatives[[i]], 2, quantile, probs = c(alpha/(2*BonferroniRectangle),1-alpha/(2*BonferroniRectangle))) %>% data.frame
+    CIellipsoid <-  list(mu = colMeans(bootstrapedMomentAndDerivatives[[i]], na.rm = TRUE),
+                         Sigma = cov(bootstrapedMomentAndDerivatives[[i]], use = "complete.ob"),
+                         radius = sqrt(qchisq(1-alpha/BonferroniEllipse, df = length(d) + length(m))))
 
-  if (method == "hyperrectangle") output <- CIhyperrect
-  if (method == "ellipsoid")   output <- CIellipsoid
-  if (method == "both")        output <- list(hyperrectangle = CIhyperrect, ellipsoid = CIellipsoid)
+    if (method == "hyperrectangle") output[[i]] <- list(hyperrectangle = CIhyperrect,a = a[i])
+    if (method == "ellipsoid")   output[[i]] <- list(ellipsoid = CIellipsoid, a = a[i])
+    if (method == "both")        output[[i]] <- list(hyperrectangle = CIhyperrect, ellipsoid = CIellipsoid, a = a[i])
 
-  # If required, return the sample of derivatives and moments obtained by bootstrap
-  if (bootSample) output <- c(output, list(bootSample = bootstrapedMomentAndDerivatives))
+    # If required, return the sample of derivatives and moments obtained by bootstrap
+    if (bootSample) output[[i]] <- c(output[[i]], list(bootSample = bootstrapedMomentAndDerivatives[[i]]))
+  }
 
+  if (length(a) ==1) output <- output[[1]]
   return(output)
 }
 
@@ -210,7 +216,7 @@ plotCI <- function(sample,CI)
     dataPlot <- rbind(dataPlot, newData)
   }
   plot <- ggplot(dataPlot) +
-    geom_point(aes(x = x, y = y) ) +
+    geom_point(aes(x = x, y = y), colour = alpha("black", 1/3)) +
     facet_grid(yName ~ xName, scales = "free") +
     labs(x = "", y = "")
 

@@ -15,14 +15,16 @@ getCIMomentAndDerivatives(sample, a, m = NULL, d = NULL, nboot = 1000,
 Title
 }
 \examples{
-a <- 0 ; m <- c(0, 1) ; d <- 1 ; nboot <- 1000
-sample <- rnorm(100, 0, 1)
+a <- c(0,1) ; m <- c(0, 1) ; d <- 1 ; nboot <- 1000
+set.seed(100) ; sample <- rnorm(100, 0, 1)
+hist(sample)
 CI <- getCIMomentAndDerivatives(sample, a,m,d,nboot = nboot,mc.cores = 4, method = "both", bootSample = TRUE)
 
-title <- "Ellipsoidal and Rectangular 95\%-CI of the Estimated Parameters"
-plot <- plotCI(CI$bootSample, CI)
-plot + geom_point(aes(x = dnorm(a), y = 1-pnorm(a)), colour = "blue") +
-geom_text(aes(x = 1.009*dnorm(a), y = 1-pnorm(a), label = "True Value"), colour = "blue")+
+i <- 2
+title <- paste0("95\%-CI of the Estimated Parameters when a = ",a[i])
+plot <- plotCI(CI[[i]]$bootSample, CI[[i]])
+plot + geom_point(aes(x = dnorm(a[i]), y = 1-pnorm(a[i])), colour = "blue") +
+geom_text(aes(x = 1.009*dnorm(a[i]), y = 1-pnorm(a[i]), label = "True Value"), colour = "blue")+
 labs(x = "Derivative of order 1", y = "Moment of order 0") + ggtitle(title)
 
 }
