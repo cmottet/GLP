@@ -15,5 +15,6 @@ Imports:
   plyr,
   gtools,
   ggplot2,
-  bootstrap
+  bootstrap,
+  ks
 
