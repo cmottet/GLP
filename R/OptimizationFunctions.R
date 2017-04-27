@@ -18,7 +18,7 @@ innerOptimizationFunction = function(x,lpdual,phase,constFun,paramConsFun, objFu
 }
 
 
-#' Title
+#' GLPPhase2
 #'
 #' @param initBFS
 #' @param objFun
@@ -268,7 +268,7 @@ GLPPhase2 = function(initBFS,
 }
 
 
-#' Title
+#' GLPPhase1
 #'
 #' @param constFun
 #' @param constRHS

@@ -19,9 +19,10 @@ cleanAndcheckdAndm <- function(d,m){
 }
 
 # Function to obtain the bootstraped values of the functions contained in fboot
-getBootstrapedValues <- function(sample, fboot, nboot = 1E3,mc.cores = 1)
+getBootstrapedValues <- function(sample, fboot, nboot = 1E3,mc.cores = 1, seed = NULL)
 {
   if (class(fboot) != "list") fboot <- list(fboot)
+  if (!is.null(seed)) set.seed(seed)
 
   FUN <- function(theta) bootstrap::bootstrap(x = sample, nboot, theta = theta)$thetastar
   bootstrapedValues <- parallel::mclapply(X =  fboot, FUN = FUN,mc.cores = mc.cores)
@@ -30,7 +31,7 @@ getBootstrapedValues <- function(sample, fboot, nboot = 1E3,mc.cores = 1)
   return(output)
 }
 
-# Create the functions to estimate E[X^mI(x => a)] and f^(d)(a)
+# Create the functions to estimate E[(X-a)^mI(X => a)] and f^(d)(a)
 buildMomentAndDerivativesFunctions <- function(a, m = NULL, d = NULL, ...){
   # Initialize list of Functions
   nFunc <- length(d) + length(m)
@@ -47,8 +48,8 @@ buildMomentAndDerivativesFunctions <- function(a, m = NULL, d = NULL, ...){
 
   # Build Functions for moments
   for (order in m){
-    if (order ==0) Func[[i]] <- function(x) 1 - sROC::kCDF(x = x, xgrid = a)$Fhat
-    if (order !=0) Func[[i]] <- eval(substitute(function(x) mean(x^order*(x >= a), na.rm = TRUE),list(order=order)))
+    if (order == 0) Func[[i]] <- function(x) 1 - sROC::kCDF(x = x, xgrid = a)$Fhat
+    if (order != 0) Func[[i]] <- eval(substitute(function(x) mean((x-a)^order*(x >= a), na.rm = TRUE),list(order=order)))
     i <- i + 1
   }
 
@@ -57,7 +58,7 @@ buildMomentAndDerivativesFunctions <- function(a, m = NULL, d = NULL, ...){
 }
 
 
-#' Build confidence intervals for the quantities E[X^m I(X => a)] and  f^(d)(a)
+#' Build confidence intervals for the quantities E[(X-a)^m I(X => a)] and  f^(d)(a)
 #'
 #' Using bootstrap, this function builds (1-alpha)-confidence intervals for the truncated moments E[X^m I(X => a)]
 #' and derivatives f^(d)(a) for a given sample and threshold \emph{a}. The confidence intervals can be either hyperrectangles,
@@ -109,7 +110,7 @@ buildMomentAndDerivativesFunctions <- function(a, m = NULL, d = NULL, ...){
 #'
 getCIMomentAndDerivatives = function(sample,a,m = NULL,d=NULL, nboot = 1E3, alpha = 0.05,
                                      method = c("hyperrectangle","ellipsoid", "both"),
-                                     mc.cores = 1, bootSample = FALSE, bonferroni = FALSE)
+                                     mc.cores = 1, bootSample = FALSE, bonferroni = FALSE, seed = NULL)
 {
   method <- match.arg(method)
 
@@ -123,7 +124,7 @@ getCIMomentAndDerivatives = function(sample,a,m = NULL,d=NULL, nboot = 1E3, alph
 
 
   fboot <- lapply(a,buildMomentAndDerivativesFunctions,  m = m, d = d)
-  bootstrapedMomentAndDerivatives <- lapply(fboot,getBootstrapedValues, sample = sample, nboot = nboot, mc.cores = mc.cores)
+  bootstrapedMomentAndDerivatives <- lapply(fboot,getBootstrapedValues, sample = sample, nboot = nboot, mc.cores = mc.cores, seed = seed)
 
   output <- vector("list", length(a))
   for (i in 1:length(a)){
