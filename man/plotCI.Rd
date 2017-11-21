@@ -2,15 +2,22 @@
 % Please edit documentation in R/EstimateOptimizationParameters.R
 \name{plotCI}
 \alias{plotCI}
-\title{Title}
+\title{Plot hyperrectangular and ellipsoidal confidence intervals}
 \usage{
 plotCI(sample, CI)
 }
 \arguments{
-\item{CI}{}
+\item{sample}{Vector of sample points}
+
+\item{CI}{List containing either \emph{hyperrectangle}{, data.frame containing the lower bounds
+and upper bounds of the derivatives and truncated moments.}, or \item{ellipsoid}{, a list containing the vector of means,
+the covariance matrix, and the radius of the ellipsoid describing the confidence interval}}
+}
+\value{
+an object of class ggplot2
 }
 \description{
-Title
+Plot hyperrectangular and ellipsoidal confidence intervals
 }
 \examples{
 set.seed(100)
@@ -28,4 +35,3 @@ CIrectangular <- apply(sample, 2, quantile, probs = c(alpha/2,1-alpha/2))
 CI <- list(ellipsoid = CIellipsoid, hyperrectangle = CIrectangular)
 plotCI(sample,CI)
 }
-

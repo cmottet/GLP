@@ -2,23 +2,61 @@
 % Please edit documentation in R/EstimateOptimizationParameters.R
 \name{getCIMomentAndDerivatives}
 \alias{getCIMomentAndDerivatives}
-\title{Title}
+\title{Build confidence intervals for the quantities E[(X-a)^m I(X => a)] and  f^(d)(a)}
 \usage{
 getCIMomentAndDerivatives(sample, a, m = NULL, d = NULL, nboot = 1000,
   alpha = 0.05, method = c("hyperrectangle", "ellipsoid", "both"),
-  mc.cores = 1, bootSample = FALSE, ...)
+  mc.cores = 1, bootSample = FALSE, bonferroni = FALSE, seed = NULL)
 }
 \arguments{
-\item{...}{}
+\item{sample}{Vector containing the sample values of the random variable X}
+
+\item{a}{Vector of values at which the derivatives and moments are estimated}
+
+\item{m}{Vector of  real numbers}
+
+\item{d}{Vector of positive integers}
+
+\item{nboot}{The number of bootstrap samples desired}
+
+\item{alpha}{Desired accuracy level for the confidence interval. Default value is 5\%}
+
+\item{method}{A string either equal to \emph{hyperrectangle}, \emph{ellipsoid}, or \emph{both}
+defining the type of confidence intervals. Default value is \emph{hyperrectangle}}
+
+\item{mc.cores}{Number of cores  used in the computation of the confidence intervals. Default value is 1.
+If \emph{mc.cores > 1}, parallel computing takes place with a total of \emph{mc.cores}}
+
+\item{bootSample}{Logical value indicating wether the bootstraped sample should be returned by the function}
+}
+\value{
+A list of with the same length as the vector \emph{a} of the argument list. Each cell of the list is also a list which contains
+\item{hyperrectangle}{A data.frame containing the lower bounds and upper bounds of the derivatives and truncated moments. Only in
+ the case when the argument \emph{method} = \emph{hyperrectangle} or \emph{both}}
+\item{ellipsoid}{A list containing the vecor of means, the covariance matrix, and the radius of the ellipsoid describing the confidence interval. Only in
+the case  when the argument \emph{method} = \emph{ellipsoid} or \emph{both}}
+\item{a}{scalar value giving the threshold \emph{a} for the associated confidence interval}
+\item{bootSample}{Matrix containing the bootstrapped samples used to build the confidence intervals.
+Each row contains one bootstrap of the original sample}
 }
 \description{
-Title
+Using bootstrap, this function builds (1-alpha)-confidence intervals for the truncated moments E[X^m I(X => a)]
+and derivatives f^(d)(a) for a given sample and threshold \emph{a}. The confidence intervals can be either hyperrectangles,
+or ellipsoids.
 }
 \examples{
 a <- c(0,1) ; m <- c(0, 1) ; d <- 1 ; nboot <- 1000
 set.seed(100) ; sample <- rnorm(100, 0, 1)
 hist(sample)
-CI <- getCIMomentAndDerivatives(sample, a,m,d,nboot = nboot,mc.cores = 4, method = "both", bootSample = TRUE)
+CI <- getCIMomentAndDerivatives(sample, a,m,d,nboot = nboot,mc.cores = 1, method = "both", bootSample = TRUE)
+
+library(ggplot2)
+i <- 1
+title <- paste0("95\%-CI of the Estimated Parameters when a = ",a[i])
+plot <- plotCI(CI[[i]]$bootSample, CI[[i]])
+plot + geom_point(aes(x = dnorm(a[i]), y = 1-pnorm(a[i])), colour = "blue") +
+geom_text(aes(x = 1.009*dnorm(a[i]), y = 1-pnorm(a[i]), label = "True Value"), colour = "blue")+
+labs(x = "Derivative of order 1", y = "Moment of order 0") + ggtitle(title)
 
 i <- 2
 title <- paste0("95\%-CI of the Estimated Parameters when a = ",a[i])
@@ -28,4 +66,3 @@ geom_text(aes(x = 1.009*dnorm(a[i]), y = 1-pnorm(a[i]), label = "True Value"), c
 labs(x = "Derivative of order 1", y = "Moment of order 0") + ggtitle(title)
 
 }
-
