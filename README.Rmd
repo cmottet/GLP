@@ -4,5 +4,7 @@ This package is the companion R package to the paper by Mottet, C. and Lam, H. "
 
 It can be installed in R using the command
 
+\code{
 install.packages("devtools")
 devtools::install_github("cmottet/GLP")
+}
