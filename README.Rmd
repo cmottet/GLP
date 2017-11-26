@@ -1,8 +1,8 @@
 # README
 
-This package is the companion R package to the paper by Mottet, C. and Lam, H. [*"On Optimization over Tail Distributions"*](https://arxiv.org/abs/1711.00573). It is designed to solve program (24) using the generalized linear programming (GLP) procedure described in Algorith 1.
+This package is the companion *R* package to the paper by [*"On Optimization over Tail Distributions"*](https://arxiv.org/abs/1711.00573)  Mottet, C. and Lam, H.. It is designed to solve program (24) using the generalized linear programming (GLP) procedure described in Algorithm 1.
 
-It can be installed in R using the command
+It can be installed in *R* using the command
 
 ```
 install.packages("devtools")

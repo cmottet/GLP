@@ -5,8 +5,8 @@
 \title{Function to solve programs such as (24)}
 \usage{
 phase2(initBFS, objFun, constFun, constRHS, constDir, constLambda = rep(0,
-  length(constRHS)), objLambda = 0, gamma = NULL, C = 10000,
-  IterMax = 100, err = 1e-06, rerr = 1e-04)
+  length(constRHS)), objLambda = 0, C = 10000, IterMax = 100,
+  err = 1e-06)
 }
 \arguments{
 \item{initBFS}{List containing a boolean \emph{feasible} indicating wether an initial feasible was found for (24), and if so, \emph{initBFS} should
@@ -36,8 +36,7 @@ A list containing
 \item{x}{Vector containing the point supports of the optimal distribution function when the program is feasible and such distribution exists}
 \item{s}{Optimal value of the variable \emph{s} when the program is feasible and an optimal solution  exists}
 \item{lpdual}{Vector containing the optimal dual multipliers when the program is feasible and such an optimal solution exists}
-\item{lB}
-\item{uB}
+\item{bound}{Optimal objective value}
 \item{status}{Integer describing the final status of the procedure (0 => Reached a solution, 1 => the algorithm terminated by reaching the maximum number of iterations, 2 => the algorithm entered a cycle)}
 \item{nIter}{Number of iterations reached when the procedure terminated}
 \item{eps}{Opposite value of the inner optimization program when the procedure terminated}
@@ -60,6 +59,7 @@ this algorithm so that inequalities in (24) can be replaced by lower inequalitie
 #### Note that the solution to this problem is known (see Theorem 3.3 of Bertsimas and Popescu)
 
 # Function and parameters for the integral of the objective
+rate <- 1
 d <- qexp(0.9,rate)
 objFun <- function(x) return(as.numeric(d <= x))
 
@@ -72,6 +72,9 @@ function(x) x^2
 
 # Direction of the inequality constraints
 constDir <- rep(c("<=", ">="), each = 3)
+
+# Bounds on the inequalities
+constRHS <- rep(c(1,1,2), 2)
 
 # Values on the RHS of each inequality
 # here we choose the moment of order 0, 1, and 2 of an exponential distribution
@@ -105,5 +108,5 @@ output <- phase2(initBFS,
 CMsquare <- (mu2 - mu1^2)/mu1^2
 delta <-  (d/mu1-1)
 
-data.frame(Algorithm = output$lB, Analytical = CMsquare/(CMsquare + delta^2))
+data.frame(Algorithm = output$bound, Analytical = CMsquare/(CMsquare + delta^2))
 }

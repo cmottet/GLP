@@ -32,18 +32,15 @@ innerOptimizationFunction <- function(x,lpdual,phase,constFun, objFun = NULL)
 #' @param constDir Vector containing the direction of the constraints (\emph{e.g.} '=', '<=', ">=" )
 #' @param constLambda Vector containing the the values of the parameters \eqn{\lambda_{j,M}}  (use default vector of 0's to solve classic generalized linear programs)
 #' @param objLambda Scalar containing the value of \eqn{\lambda_M} (use default 0 to solve classic generalized linear programs)
-#' @param gamma
 #' @param C Upper bound of the support of feasible distribution functions (default 1e4)
 #' @param IterMax Maximum number of iterations for the procedure (default = 100)
 #' @param err Tolerance of the algorithm (default 1e-6)
-#' @param rerr
 #' @return A list containing
 #' \item{p}{Vector containing the point masses of the optimal distribution function when the program is feasible and such distribution exists}
 #' \item{x}{Vector containing the point supports of the optimal distribution function when the program is feasible and such distribution exists}
 #' \item{s}{Optimal value of the variable \emph{s} when the program is feasible and an optimal solution  exists}
 #' \item{lpdual}{Vector containing the optimal dual multipliers when the program is feasible and such an optimal solution exists}
-#' \item{lB}
-#' \item{uB}
+#' \item{bound}{Optimal objective value}
 #' \item{status}{Integer describing the final status of the procedure (0 => Reached a solution, 1 => the algorithm terminated by reaching the maximum number of iterations, 2 => the algorithm entered a cycle)}
 #' \item{nIter}{Number of iterations reached when the procedure terminated}
 #' \item{eps}{Opposite value of the inner optimization program when the procedure terminated}
@@ -67,6 +64,7 @@ innerOptimizationFunction <- function(x,lpdual,phase,constFun, objFun = NULL)
 #' #### Note that the solution to this problem is known (see Theorem 3.3 of Bertsimas and Popescu)
 #'
 #' # Function and parameters for the integral of the objective
+#' rate <- 1
 #' d <- qexp(0.9,rate)
 #' objFun <- function(x) return(as.numeric(d <= x))
 #'
@@ -79,6 +77,9 @@ innerOptimizationFunction <- function(x,lpdual,phase,constFun, objFun = NULL)
 #'
 #' # Direction of the inequality constraints
 #' constDir <- rep(c("<=", ">="), each = 3)
+#'
+#' # Bounds on the inequalities
+#' constRHS <- rep(c(1,1,2), 2)
 #'
 #' # Values on the RHS of each inequality
 #' # here we choose the moment of order 0, 1, and 2 of an exponential distribution
@@ -112,7 +113,7 @@ innerOptimizationFunction <- function(x,lpdual,phase,constFun, objFun = NULL)
 #' CMsquare <- (mu2 - mu1^2)/mu1^2
 #' delta <-  (d/mu1-1)
 #'
-#' data.frame(Algorithm = output$lB, Analytical = CMsquare/(CMsquare + delta^2))
+#' data.frame(Algorithm = output$bound, Analytical = CMsquare/(CMsquare + delta^2))
 phase2 <- function(initBFS,
                    objFun,
                    constFun,
@@ -120,11 +121,9 @@ phase2 <- function(initBFS,
                    constDir,
                    constLambda = rep(0,length(constRHS)),
                    objLambda = 0,
-                   gamma = NULL,
                    C        = 1e4,
                    IterMax   = 100,
-                   err       = 1e-6,
-                   rerr      = 1e-4)
+                   err       = 1e-6)
 
 {
 
@@ -140,15 +139,11 @@ phase2 <- function(initBFS,
                  lpdual    = rep(NA,length(constFun)),
                  status    = 1,
                  nIter     = 0,
-                 lB        = Inf,
-                 uB        = -Inf,
+                 bound     = -Inf,
                  eps       = Inf)
 
   # If there is no initial feasible solution, the program in unbounded
   if (!initBFS$feasible) return(output)
-
-  uB <-  Inf
-  lB <- -Inf
 
   # Initialize the number
   N <- length(constRHS)
@@ -195,7 +190,7 @@ phase2 <- function(initBFS,
     s      <- outOpt$solution[1]
     p      <- outOpt$solution[-1]
     lpdual <- outOpt$duals[1:N]
-    lB     <- outOpt$objval
+    bound  <- outOpt$objval
 
     ###
     ### Sub-program
@@ -213,11 +208,7 @@ phase2 <- function(initBFS,
     xnew <- inOpt$par
     eps  <- -inOpt$value
 
-    if (is.null(gamma)) status <- as.integer(eps > err)
-    else {
-      uB <- min(gamma*eps +  lB, uB)   ;
-      status <- as.integer( uB > lB + rerr*abs(lB) )
-    }
+    status <- as.integer(eps > err)
 
     if ( !status ) break
 
@@ -247,8 +238,7 @@ phase2 <- function(initBFS,
                  s         = s,
                  lpdual    = lpdual,
                  feasible  = initBFS$feasible,
-                 lB        = lB,
-                 uB        = uB,
+                 bound        = bound,
                  status    = status,
                  nIter     = k,
                  eps       = eps,
